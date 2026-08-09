@@ -2,15 +2,16 @@
 <p>Query a knowledge base you build with an agent: filter notes by frontmatter, then search inside them.</p>
 <h2 id="the-problem" class="tsd-anchor-link">The problem<a href="#the-problem" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>When you work with an AI agent on anything substantial, you end up with a pile of small notes —
-findings, decisions, sources, summaries. The pile is the point: it's how knowledge accumulates
-instead of being re-derived every session.</p>
+findings, decisions, sources, summaries. Small, categorized notes are how knowledge accumulates
+instead of being re-derived every session: structured frontmatter over free-form prose.</p>
 <p>But accumulation only pays off if it's findable. Past a couple dozen notes, an agent can't tell
-which fifteen of two hundred bear on its task, so it greps blindly, swallows the whole folder into
-context, or quietly rebuilds knowledge that already exists three files away.</p>
+which fifteen of two hundred bear on its task, so it greps, reads whole folders into context, or
+rebuilds knowledge that already exists three files away.</p>
 <p>The classification an agent adds while writing — <code>status</code>, <code>type</code>, <code>tags</code>, <code>source</code> — is what keeps
 the pile navigable. <code>sensemaking</code> is the layer that acts on it, without an app running, a build
-step, or you re-explaining anything.</p>
-<h2 id="how-it-works" class="tsd-anchor-link">How it works<a href="#how-it-works" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+step, or you re-explaining anything. The intended shape is a small vault per project, not one big
+one — starting a new one is a single command with no schema to design.</p>
+<h2 id="the-model" class="tsd-anchor-link">The model<a href="#the-model" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>Every file becomes a row; every frontmatter key becomes a column; the prose becomes a full-text
 index you can join against. You write named SQL queries once and run them by name.</p>
 <pre><code class="markdown">---
@@ -30,19 +31,11 @@ WHERE f.status = 'active' AND content MATCH 'revenue'
 ORDER BY bm25(content, 10.0, 5.0, 1.0) LIMIT 10
 </code><button type="button">Copy</button></pre>
 
-<p>The filter shrinks the haystack, the search finds the needle, and each row that comes back —
+<p>The filter narrows the set, the search ranks it, and each row that comes back —
 path, title, summary, matching excerpt — is enough to decide whether to open the file, without
 carrying the file. On a real 26-note vault that's a few hundred tokens, against ~6,000 to read the
 three files it points at. Cheap enough to run before deciding what to open; reading afterward is
 the expensive step, and it happens through the filesystem, not SQL.</p>
-<p>Two properties make it trustworthy:</p>
-<ul>
-<li><strong>Never stale.</strong> Every query re-checks the filesystem first, re-reading only what changed. The
-SQLite cache under <code>.sense/</code> is disposable — delete it any time, the next query rebuilds it. An
-agent can trust a result without knowing when anything was last indexed.</li>
-<li><strong>Headless.</strong> Files on disk are the only source of truth. Nothing needs to be open — not
-Obsidian, not a server, not a daemon.</li>
-</ul>
 <h2 id="use-it" class="tsd-anchor-link">Use it<a href="#use-it" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">install</span><span class="hl-1"> </span><span class="hl-3">-g</span><span class="hl-1"> </span><span class="hl-2">sensemaking</span><br/><span class="hl-0">cd</span><span class="hl-1"> </span><span class="hl-2">your-notes</span><span class="hl-1"> &amp;&amp; </span><span class="hl-0">sense</span><span class="hl-1"> </span><span class="hl-2">init</span><span class="hl-1">        </span><span class="hl-4"># writes a minimal sense.config.json (globs only, no queries)</span>
 </code><button type="button">Copy</button></pre>
@@ -83,12 +76,22 @@ result row often answers the question with no file read at all) and a weighted s
 
 <p>The skill teaches an agent the essentials: discovery, <code>--list</code>, <code>--format json</code>, <code>has()</code>, when to
 use ad-hoc <code>query</code> versus saving a named one, and when to <code>rebuild</code>.</p>
-<h3 id="optional-a-background-pre-warmer" class="tsd-anchor-link">Optional: a background pre-warmer<a href="#optional-a-background-pre-warmer" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<p><code>sense watch</code> runs the same reconcile ahead of time whenever the filesystem changes, so queries
-open on an already-warm cache. It's purely an optimization — queries reconcile on open anyway, so
-a missed event can never make a result wrong — and under ~1000 files you likely won't notice a
-difference. It runs in the foreground and never daemonizes; process supervision belongs to the OS.
-launchd and systemd examples: <a href="media/WATCH.md">WATCH.md</a>.</p>
+<h2 id="how-it-works-how-it-scales" class="tsd-anchor-link">How it works, how it scales<a href="#how-it-works-how-it-scales" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p><code>sense</code> is a command, not an app. Nothing has to be running: it starts, answers,
+and exits.</p>
+<p>Every query begins with a freshness check: each file's timestamp and size is
+compared against the SQLite cache in <code>.sense/</code>, changed files are re-parsed, and
+deleted files are dropped. When nothing has changed, that check is the entire
+cost. Results are never stale, and the cache is disposable — <code>sense rebuild</code>
+deletes and rebuilds it.</p>
+<p>For a vault of a few hundred notes, the check takes a few milliseconds.</p>
+<p>On a large vault (10,000+ files), the check grows with file count — roughly a
+tenth of a second at 10k — and the first query after editing many files pays to
+re-parse them. <code>sense watch</code> moves that parsing into the background: a job that
+re-parses files as they change, so queries find the work already done. It is
+optional — queries always run their own check, so a stopped watcher never causes
+a wrong answer, only a slower next query. launchd and systemd examples:
+<a href="media/WATCH.md">WATCH.md</a>.</p>
 <h2 id="why-not-" class="tsd-anchor-link">Why not …<a href="#why-not-" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <ul>
 <li><strong>Obsidian (Bases/Dataview):</strong> filters this well, but only inside the running Electron app —
@@ -105,7 +108,7 @@ file changes, instead of reconciling live.</li>
 <li><strong>Note CLIs (zk and similar):</strong> good at their own model — tags, links, full text — but can't
 filter on arbitrary frontmatter fields, which is the whole point here.</li>
 <li><strong>grep / one-off scripts:</strong> fine until you want named, reusable, parameterized queries with real
-AND/OR/ORDER BY — at which point you've started writing a worse query engine.</li>
+AND/OR/ORDER BY — at which point you're writing your own query engine.</li>
 </ul>
 <p><code>sensemaking</code> is deliberately thin glue: <a href="https://github.com/jonschlinkert/gray-matter">gray-matter</a>
 parses, <a href="https://github.com/zuchka/remove-markdown">remove-markdown</a> cleans the prose for indexing,
@@ -123,4 +126,4 @@ doesn't.</p>
 (document properties, sidecar JSON) can join it without changing the query surface.</p>
 <h2 id="license" class="tsd-anchor-link">License<a href="#license" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>MIT © Kevin Malakoff</p>
-</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#sensemaking"><span>sensemaking</span></a><ul><li><a href="#the-problem"><span>The problem</span></a></li><li><a href="#how-it-works"><span>How it works</span></a></li><li><a href="#use-it"><span>Use it</span></a></li><li><ul><li><a href="#content-search"><span>Content search</span></a></li><li><a href="#for-ai-agents"><span>For <wbr/>AI agents</span></a></li><li><a href="#optional-a-background-pre-warmer"><span>Optional: a background pre-<wbr/>warmer</span></a></li></ul></li><li><a href="#why-not-"><span>Why not …</span></a></li><li><a href="#roadmap"><span>Roadmap</span></a></li><li><a href="#license"><span>License</span></a></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">sensemaking</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
+</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#sensemaking"><span>sensemaking</span></a><ul><li><a href="#the-problem"><span>The problem</span></a></li><li><a href="#the-model"><span>The model</span></a></li><li><a href="#use-it"><span>Use it</span></a></li><li><ul><li><a href="#content-search"><span>Content search</span></a></li><li><a href="#for-ai-agents"><span>For <wbr/>AI agents</span></a></li></ul></li><li><a href="#how-it-works-how-it-scales"><span>How it works, how it scales</span></a></li><li><a href="#why-not-"><span>Why not …</span></a></li><li><a href="#roadmap"><span>Roadmap</span></a></li><li><a href="#license"><span>License</span></a></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">sensemaking</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
