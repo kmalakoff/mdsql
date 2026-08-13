@@ -102,7 +102,9 @@ noted on stderr.</p>
 <h2 id="reference" class="tsd-anchor-link">Reference<a href="#reference" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <ul>
 <li><code>has(field, value)</code> — the one custom SQL function: array membership on JSON-array fields,
-substring on strings, false on missing keys.</li>
+substring on strings (so <code>has(f.status, 'active')</code> also matches <code>inactive</code>), false on missing
+keys. Exact matches: <code>=</code> for scalars, <code>EXISTS (SELECT 1 FROM json_each(f.tags) WHERE value = ?)</code>
+for array members.</li>
 <li>Reserved frontmatter keys (dropped with a warning): <code>path</code>, <code>_mtime</code>, <code>_size</code>, <code>_rank</code>,
 <code>content</code>, <code>links</code>, <code>sections</code>.</li>
 <li>FTS5 syntax in <code>MATCH</code>: <code>a OR b</code>, <code>&quot;phrase&quot;</code>, <code>pref*</code>, <code>NEAR(a b, 5)</code>, <code>summary: term</code>.
