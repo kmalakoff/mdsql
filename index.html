@@ -54,11 +54,7 @@ afterward through the filesystem, scoped to the line ranges <code>peek</code> re
 the agent holds lightweight identifiers and loads payloads only when needed.</p>
 <p>Measured costs: a <code>find</code> row is ~20–40 tokens, a <code>peek</code> is ~17% of reading the file, and the
 section it points at is a direct <code>Read</code> range.</p>
-<pre><code class="sql">-- filter and search compose in one query
-SELECT f.path, content.title, snippet(content, -1, '«', '»', '…', 10) AS hit
-FROM frontmatter f JOIN content ON content.path = f.path
-WHERE f.status = 'active' AND content MATCH 'revenue'
-ORDER BY bm25(content, 10.0, 5.0, 1.0) LIMIT 10
+<pre><code class="sql"><span class="hl-4">-- filter and search compose in one query</span><br/><span class="hl-3">SELECT</span><span class="hl-1"> f.path, content.title, snippet(content, -</span><span class="hl-5">1</span><span class="hl-1">, </span><span class="hl-2">&#39;«&#39;</span><span class="hl-1">, </span><span class="hl-2">&#39;»&#39;</span><span class="hl-1">, </span><span class="hl-2">&#39;…&#39;</span><span class="hl-1">, </span><span class="hl-5">10</span><span class="hl-1">) </span><span class="hl-3">AS</span><span class="hl-1"> hit</span><br/><span class="hl-3">FROM</span><span class="hl-1"> frontmatter f </span><span class="hl-3">JOIN</span><span class="hl-1"> content </span><span class="hl-3">ON</span><span class="hl-1"> content.path = f.path</span><br/><span class="hl-3">WHERE</span><span class="hl-1"> f.status = </span><span class="hl-2">&#39;active&#39;</span><span class="hl-1"> </span><span class="hl-3">AND</span><span class="hl-1"> content </span><span class="hl-3">MATCH</span><span class="hl-1"> </span><span class="hl-2">&#39;revenue&#39;</span><br/><span class="hl-3">ORDER BY</span><span class="hl-1"> bm25(content, </span><span class="hl-5">10</span><span class="hl-1">.</span><span class="hl-5">0</span><span class="hl-1">, </span><span class="hl-5">5</span><span class="hl-1">.</span><span class="hl-5">0</span><span class="hl-1">, </span><span class="hl-5">1</span><span class="hl-1">.</span><span class="hl-5">0</span><span class="hl-1">) </span><span class="hl-3">LIMIT</span><span class="hl-1"> </span><span class="hl-5">10</span>
 </code><button type="button">Copy</button></pre>
 
 <h2 id="verbs" class="tsd-anchor-link">Verbs<a href="#verbs" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
