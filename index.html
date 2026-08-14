@@ -71,7 +71,7 @@ section it points at is a direct <code>Read</code> range.</p>
 <td>doc count, frontmatter field coverage, top hubs by link rank, recent changes</td>
 </tr>
 <tr>
-<td><code>find &quot;&lt;terms&gt;&quot; [--where &quot;&lt;sql&gt;&quot;] [--k n]</code></td>
+<td><code>find &quot;&lt;terms&gt;&quot; [--where &quot;&lt;sql&gt;&quot;] [--k n] [--semantic]</code></td>
 <td>BM25 + link-graph expansion, fused; <code>via</code> marks each row <code>match</code>, <code>link</code>, or <code>match+link</code></td>
 </tr>
 <tr>
@@ -87,7 +87,9 @@ section it points at is a direct <code>Read</code> range.</p>
 <p><code>find</code> seeds a personalized-PageRank walk with the BM25 matches, so a note that never contains
 the terms but is linked from ones that do still surfaces. Terms pass verbatim to FTS5 <code>MATCH</code>
 (bare words AND-join; operators are yours to write). <code>--where</code> takes a frontmatter condition
-against alias <code>f</code>.
+against alias <code>f</code>. On trees with the <code>embed</code> feature, <code>--semantic</code> additionally expands by
+meaning — explicit per query, never silent; rows it adds are labeled <code>via: vector</code> and carry a
+<code>lines</code> column pointing at the best-matching section.
 <code>--format json</code> on any verb returns structured output.</p>
 <h2 id="config" class="tsd-anchor-link">Config<a href="#config" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p><code>sense init</code> writes <code>sense.config.json</code>; discovery walks up from cwd like git
@@ -99,6 +101,11 @@ against alias <code>f</code>.
 goes BM25-only without <code>links</code>, <code>map</code> drops hubs without <code>rank</code>, <code>peek</code> drops the outline
 without <code>sections</code>). Toggling rebuilds the cache. Older config versions auto-migrate on load,
 noted on stderr.</p>
+<p><code>embed</code> is the one opt-in feature (absent = off; most trees don't need vectors): <code>&quot;embed&quot;: true</code>
+uses the built-in static model (downloaded to <code>~/.cache/sensemaking</code> on first use, never in the
+package), or <code>{ &quot;model&quot;, &quot;type&quot;: &quot;static&quot;|&quot;api&quot;, &quot;url&quot;, &quot;key&quot; }</code> points at any Model2Vec model,
+local path, or OpenAI-compatible endpoint (Ollama, LM Studio, hosted). With it on, vectors stay
+fresh at reconcile and <code>find --semantic</code> uses them; default <code>find</code> results are unchanged.</p>
 <h2 id="reference" class="tsd-anchor-link">Reference<a href="#reference" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <ul>
 <li><code>has(field, value)</code> — the one custom SQL function: array membership on JSON-array fields,
@@ -143,10 +150,9 @@ maintaining it; <code>find</code> is the hybrid local search it calls for.</li>
 query it headless.</li>
 <li><strong>Index-on-build tools (MarkdownDB)</strong> — query a snapshot; <code>sense</code> reconciles on every query.</li>
 <li><strong>Note CLIs (zk)</strong> — fixed schema; <code>sense</code> filters on arbitrary frontmatter.</li>
-<li><strong>RAG / vector stores</strong> — similarity can't express <code>WHERE status = 'active'</code>. Vector recall is
-planned as an optional <code>embed</code> feature (pure-JS provider package, fused into <code>find</code>) — not
-blocked (<code>node:sqlite</code> can load extensions since Node 22.13), just deferred until BM25 + links
-measurably miss.</li>
+<li><strong>RAG / vector stores</strong> — similarity can't express <code>WHERE status = 'active'</code>. Here vectors are
+the optional <code>embed</code> feature: same SQLite file, filters compose, expansion is explicit per
+query (<code>find --semantic</code>) and labeled — no second store, no daemon, no native builds.</li>
 </ul>
 <p>Dependencies: <a href="https://github.com/eemeli/yaml">yaml</a>,
 <a href="https://github.com/zuchka/remove-markdown">remove-markdown</a>,
