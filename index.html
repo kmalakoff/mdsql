@@ -16,7 +16,7 @@ results are never stale and nothing has to be running.</p>
 </code><button type="button">Copy</button></pre>
 
 <h2 id="model" class="tsd-anchor-link">Model<a href="#model" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<p>Every file becomes rows in four tables:</p>
+<p>Every file becomes rows in these tables, plus whatever an enabled feature adds of its own:</p>
 <table>
 <thead>
 <tr>
@@ -52,16 +52,17 @@ results are never stale and nothing has to be running.</p>
 afterward through the filesystem, scoped to the line ranges <code>peek</code> returns. This is the
 <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">just-in-time context pattern</a>:
 the agent holds lightweight identifiers and loads payloads only when needed.</p>
-<p>Measured costs: a <code>find</code> row is ~20–40 tokens, a <code>peek</code> is ~17% of reading the file, and the
-section it points at is a direct <code>Read</code> range.</p>
+<p>Output size is a contract, measured per release (<a href="media/BENCHMARKING.md">BENCHMARKING.md</a>): <code>map</code> is
+fixed-size, a <code>find</code> row is tens of tokens, and a <code>peek</code> stays flat however large the note is —
+so what it saves over reading grows with the file, and a small note is cheaper read whole.</p>
 <pre><code class="sql"><span class="hl-4">-- filter and search compose in one query</span><br/><span class="hl-3">SELECT</span><span class="hl-1"> f.path, content.title, snippet(content, -</span><span class="hl-5">1</span><span class="hl-1">, </span><span class="hl-2">&#39;«&#39;</span><span class="hl-1">, </span><span class="hl-2">&#39;»&#39;</span><span class="hl-1">, </span><span class="hl-2">&#39;…&#39;</span><span class="hl-1">, </span><span class="hl-5">10</span><span class="hl-1">) </span><span class="hl-3">AS</span><span class="hl-1"> hit</span><br/><span class="hl-3">FROM</span><span class="hl-1"> frontmatter f </span><span class="hl-3">JOIN</span><span class="hl-1"> content </span><span class="hl-3">ON</span><span class="hl-1"> content.path = f.path</span><br/><span class="hl-3">WHERE</span><span class="hl-1"> f.status = </span><span class="hl-2">&#39;active&#39;</span><span class="hl-1"> </span><span class="hl-3">AND</span><span class="hl-1"> content </span><span class="hl-3">MATCH</span><span class="hl-1"> </span><span class="hl-2">&#39;revenue&#39;</span><br/><span class="hl-3">ORDER BY</span><span class="hl-1"> bm25(content, </span><span class="hl-5">10</span><span class="hl-1">.</span><span class="hl-5">0</span><span class="hl-1">, </span><span class="hl-5">5</span><span class="hl-1">.</span><span class="hl-5">0</span><span class="hl-1">, </span><span class="hl-5">1</span><span class="hl-1">.</span><span class="hl-5">0</span><span class="hl-1">) </span><span class="hl-3">LIMIT</span><span class="hl-1"> </span><span class="hl-5">10</span>
 </code><button type="button">Copy</button></pre>
 
-<h2 id="verbs" class="tsd-anchor-link">Verbs<a href="#verbs" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h2 id="commands" class="tsd-anchor-link">Commands<a href="#commands" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <table>
 <thead>
 <tr>
-<th>verb</th>
+<th>command</th>
 <th>does</th>
 </tr>
 </thead>
@@ -76,69 +77,98 @@ section it points at is a direct <code>Read</code> range.</p>
 </tr>
 <tr>
 <td><code>peek &lt;path&gt;</code></td>
-<td>frontmatter + heading outline (<code>[L143-162, ~380t]</code>) + links both ways, capped at 20 per list</td>
+<td>frontmatter + heading outline (<code>[L143-162, ~380t]</code>) + links both ways — first 20 per list, each with its total; the <code>links</code> table has the rest</td>
 </tr>
 <tr>
 <td><code>query &quot;&lt;sql&gt;&quot; [params...]</code></td>
-<td>ad-hoc SQL over all four tables; <code>?</code> binds positional args</td>
+<td>ad-hoc SQL over all the tables; <code>?</code> binds positional args</td>
+</tr>
+<tr>
+<td><code>&lt;name&gt; [params...]</code></td>
+<td>run a query saved in the config; <code>--list</code> names them</td>
+</tr>
+<tr>
+<td><code>init</code></td>
+<td>write a starter <code>sense.config.json</code></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>index location, doc count, feature state, watcher heartbeat</td>
+</tr>
+<tr>
+<td><code>check</code></td>
+<td>prepare and run the saved queries, so a broken one fails here instead of mid-task</td>
+</tr>
+<tr>
+<td><code>rebuild</code></td>
+<td>delete the cache and re-crawl</td>
+</tr>
+<tr>
+<td><code>watch</code></td>
+<td>keep the index warm in the background (optional; see <a href="media/WATCH.md">WATCH.md</a>)</td>
 </tr>
 </tbody>
 </table>
 <p><code>find</code> seeds a personalized-PageRank walk with the BM25 matches, so a note that never contains
 the terms but is linked from ones that do still surfaces. Terms pass verbatim to FTS5 <code>MATCH</code>
-(bare words AND-join; operators are yours to write). <code>--where</code> takes a frontmatter condition
-against alias <code>f</code>. On trees with the <code>embed</code> feature, <code>--semantic</code> additionally expands by
-meaning — explicit per query, never silent; rows it adds are labeled <code>via: vector</code> and carry a
-<code>lines</code> column pointing at the best-matching section.
-<code>--format json</code> on any verb returns structured output.</p>
+(bare words AND-join; operators are yours to write). <code>--where</code> takes any SQL condition against
+frontmatter alias <code>f</code>. On trees with the <code>embed</code> feature, <code>--semantic</code> additionally expands by
+meaning — explicit per query, never silent; rows it adds are labeled <code>via: vector</code> and carry
+<code>similarity</code> (cosine against the best-matching chunk). A <code>lines</code> column points at the section
+that earned a row — a direct read range. <code>--format json</code> on any command returns structured
+output; <code>--version</code> and <code>--help</code> do what they say.</p>
 <h2 id="config" class="tsd-anchor-link">Config<a href="#config" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p><code>sense init</code> writes <code>sense.config.json</code>; discovery walks up from cwd like git
 (<code>--config &lt;path&gt;</code> overrides). Name reusable queries and run them as <code>sense &lt;name&gt; [params...]</code>:</p>
-<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;$schema&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;https://unpkg.com/sensemaking/schema.json&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;version&quot;</span><span class="hl-1">: </span><span class="hl-5">2</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;scan&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;include&quot;</span><span class="hl-1">: [</span><span class="hl-2">&quot;**/*.md&quot;</span><span class="hl-1">] },</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;features&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;links&quot;</span><span class="hl-1">: </span><span class="hl-3">true</span><span class="hl-1">, </span><span class="hl-6">&quot;sections&quot;</span><span class="hl-1">: </span><span class="hl-3">true</span><span class="hl-1">, </span><span class="hl-6">&quot;rank&quot;</span><span class="hl-1">: </span><span class="hl-3">true</span><span class="hl-1"> },</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;queries&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;by-tag&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;SELECT path, title FROM frontmatter WHERE has(tags, ?) ORDER BY path&quot;</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">}</span>
+<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;$schema&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;https://unpkg.com/sensemaking/schema.json&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;version&quot;</span><span class="hl-1">: </span><span class="hl-5">2</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;scan&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;include&quot;</span><span class="hl-1">: [</span><span class="hl-2">&quot;**/*.md&quot;</span><span class="hl-1">] },</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;features&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;links&quot;</span><span class="hl-1">: </span><span class="hl-3">true</span><span class="hl-1">, </span><span class="hl-6">&quot;sections&quot;</span><span class="hl-1">: </span><span class="hl-3">true</span><span class="hl-1">, </span><span class="hl-6">&quot;rank&quot;</span><span class="hl-1">: </span><span class="hl-3">true</span><span class="hl-1"> },</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;defaults&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;find&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;where&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;f.type != &#39;generated&#39;&quot;</span><span class="hl-1"> } },</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;queries&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;dead-links&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;SELECT src, target FROM links WHERE dst IS NULL&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;by-tag&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;SELECT path, title FROM frontmatter WHERE has(tags, ?) ORDER BY path&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;hot&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;find&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;pricing OR billing&quot;</span><span class="hl-1">, </span><span class="hl-6">&quot;k&quot;</span><span class="hl-1">: </span><span class="hl-5">20</span><span class="hl-1"> }</span><br/><span class="hl-1">  },</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;checks&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;dead-links&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;empty&quot;</span><span class="hl-1"> }</span><br/><span class="hl-1">}</span>
 </code><button type="button">Copy</button></pre>
 
-<p>Features toggle independently; disabling one degrades its verb instead of failing it (<code>find</code>
+<p>A query entry is a SQL string, or a saved <code>find</code> with its settings baked in — <code>sense hot</code>
+then needs no flags. <code>defaults.find.where</code> scopes <code>find</code> tree-wide (an explicit <code>--where</code>
+replaces it, so <code>--where &quot;1=1&quot;</code> always reaches everything). <code>checks</code> turns a saved query
+into an assertion: <code>sense check</code> fails when a query marked <code>empty</code> returns rows. Every key
+is documented in <a href="media/schema.json">schema.json</a>, which editors read for autocomplete.</p>
+<p>Features toggle independently; disabling one degrades its command instead of failing it (<code>find</code>
 goes BM25-only without <code>links</code>, <code>map</code> drops hubs without <code>rank</code>, <code>peek</code> drops the outline
 without <code>sections</code>). Toggling rebuilds the cache. Older config versions auto-migrate on load,
 noted on stderr.</p>
-<p><code>embed</code> is the one opt-in feature (absent = off; most trees don't need vectors): <code>&quot;embed&quot;: true</code>
-uses the built-in static model (downloaded to <code>~/.cache/sensemaking</code> on first use, never in the
-package), or <code>{ &quot;model&quot;, &quot;type&quot;: &quot;static&quot;|&quot;api&quot;, &quot;url&quot;, &quot;key&quot; }</code> points at any Model2Vec model,
+<p><code>embed</code> is opt-in — the only feature off by default, since most trees don't need vectors.
+<code>&quot;embed&quot;: true</code> uses the built-in static model (downloaded to <code>~/.cache/sensemaking</code> on first
+use, never in the package), or <code>{ &quot;model&quot;, &quot;type&quot;: &quot;static&quot;|&quot;api&quot;, &quot;url&quot;, &quot;key&quot; }</code> points at any Model2Vec model,
 local path, or OpenAI-compatible endpoint (Ollama, LM Studio, hosted). With it on, vectors stay
 fresh at reconcile and <code>find --semantic</code> uses them; default <code>find</code> results are unchanged.</p>
-<h2 id="reference" class="tsd-anchor-link">Reference<a href="#reference" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<ul>
-<li><code>has(field, value)</code> — the one custom SQL function: array membership on JSON-array fields,
-substring on strings (so <code>has(f.status, 'active')</code> also matches <code>inactive</code>), false on missing
-keys. Exact matches: <code>=</code> for scalars, <code>EXISTS (SELECT 1 FROM json_each(f.tags) WHERE value = ?)</code>
-for array members.</li>
-<li>Reserved frontmatter keys (dropped with a warning): <code>path</code>, <code>_mtime</code>, <code>_size</code>, <code>_rank</code>,
-<code>content</code>, <code>links</code>, <code>sections</code>.</li>
-<li>FTS5 syntax in <code>MATCH</code>: <code>a OR b</code>, <code>&quot;phrase&quot;</code>, <code>pref*</code>, <code>NEAR(a b, 5)</code>, <code>summary: term</code>.
-Stemmed; markdown is stripped at index time. <code>bm25(content, 10.0, 5.0, 1.0)</code> weights title
-over summary over body.</li>
-<li>A one-line <code>summary:</code> in frontmatter is both a selectable column and a weighted search field.</li>
-<li>Exit codes: <code>0</code> ok, <code>1</code> error (SQLite message verbatim), <code>2</code> usage.</li>
-<li>Frontmatter parsing is lenient: syntax errors (an alias starting with <code>@</code>, say) are per-file
-warnings and the values are still indexed.</li>
-</ul>
+<p><code>has(field, value)</code> is the one custom SQL function: array membership on JSON-array fields,
+substring on strings, false on missing keys. Frontmatter parsing is lenient — syntax errors are
+per-file warnings and the values are still indexed, so one bad note never costs you the crawl.</p>
 <h2 id="scale" class="tsd-anchor-link">Scale<a href="#scale" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>Every query starts with a freshness check against the cache in <code>.sense/</code>; only changed files are
-re-parsed. Measured per release in <a href="media/BENCHMARKING.md">BENCHMARKING.md</a> — at 6,566 notes: full
-crawl ~5 s, warm query ~100 ms, one-file change ~200 ms. <code>sense watch</code> (optional) moves
-re-parsing into the background — see <a href="media/WATCH.md">WATCH.md</a>. <code>sense rebuild</code> deletes the cache and
-re-crawls.</p>
+re-parsed. What to expect as a tree grows:</p>
+<ul>
+<li><strong>Work is linear in note count</strong> — crawl, reconcile, and the freshness check every invocation
+pays. That check is the floor cost of a query and the first thing to watch on a large tree.</li>
+<li><strong>Output is flat.</strong> <code>map</code>, <code>peek</code>, and a <code>find</code> row cost the same on a small tree as a large
+one: context cost is bounded by what you ask for, not by how much there is.</li>
+<li><strong>Bulk changes are paid by whoever queries next.</strong> <code>sense watch</code> moves that re-parse into the
+background (<a href="media/WATCH.md">WATCH.md</a>) — it changes latency, never answers, since every query
+reconciles for itself. <code>sense rebuild</code> starts the cache over.</li>
+</ul>
+<p>These are release gates rather than hopes: every release regenerates the numbers on pinned
+corpora spanning a 4x range in note count plus a stress tree that packs the worst measured
+shapes into one place — a megabyte-scale note, heading-dense outlines, dense link graphs,
+hundreds of frontmatter fields. A row that grows faster than linearly, or a token count
+that grows at all, blocks the release. Current figures: <a href="media/BENCHMARKING.md">BENCHMARKING.md</a>.</p>
 <h2 id="for-ai-agents" class="tsd-anchor-link">For AI agents<a href="#for-ai-agents" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <pre><code class="bash"><span class="hl-0">npx</span><span class="hl-1"> </span><span class="hl-2">skills</span><span class="hl-1"> </span><span class="hl-2">add</span><span class="hl-1"> </span><span class="hl-2">kmalakoff/sensemaking</span><span class="hl-1">   </span><span class="hl-4"># -g for global, -a claude-code to target</span>
 </code><button type="button">Copy</button></pre>
 
-<p>The skill teaches the descent: <code>map</code> to orient, <code>find</code> to locate, <code>peek</code> before reading,
-<code>Read</code> line ranges instead of files.</p>
+<p>Two skills: <code>sense</code> for querying a tree — what each command is for, FTS5 syntax, reading the
+<code>via</code>/<code>score</code>/<code>similarity</code> columns, worked examples — and <code>sense-setup</code> for making one, where
+features, frontmatter conventions, and note size are decisions with consequences either way.</p>
 <h2 id="prior-art" class="tsd-anchor-link">Prior art<a href="#prior-art" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <ul>
 <li><a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">Effective context engineering for AI agents</a>
 (Anthropic): agents should hold lightweight identifiers — file paths, links — and load payloads
-just in time, because context is a finite resource. The four verbs implement that pattern as a CLI.</li>
+just in time, because context is a finite resource. The commands implement that pattern as a CLI.</li>
 <li><a href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f">llm-wiki</a> (Karpathy): an
 agent-maintained wiki navigated by an <code>index.md</code> and links, which he notes needs real search
 infrastructure past a few hundred pages. <code>sense map</code> derives that index from the notes instead of
@@ -156,7 +186,9 @@ query (<code>find --semantic</code>) and labeled — no second store, no daemon,
 </ul>
 <p>Dependencies: <a href="https://github.com/eemeli/yaml">yaml</a>,
 <a href="https://github.com/zuchka/remove-markdown">remove-markdown</a>,
-<a href="https://github.com/mrmlnc/fast-glob">fast-glob</a>, and Node's built-in SQLite. No native builds.</p>
+<a href="https://github.com/mrmlnc/fast-glob">fast-glob</a>,
+<a href="https://github.com/huggingface/tokenizers.js">@huggingface/tokenizers</a> (pure JS), and Node's
+built-in SQLite. No native builds.</p>
 <h2 id="license" class="tsd-anchor-link">License<a href="#license" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>MIT © Kevin Malakoff</p>
-</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#sensemaking"><span>sensemaking</span></a><ul><li><a href="#problem"><span>Problem</span></a></li><li><a href="#quick-start"><span>Quick start</span></a></li><li><a href="#model"><span>Model</span></a></li><li><a href="#verbs"><span>Verbs</span></a></li><li><a href="#config"><span>Config</span></a></li><li><a href="#reference"><span>Reference</span></a></li><li><a href="#scale"><span>Scale</span></a></li><li><a href="#for-ai-agents"><span>For <wbr/>AI agents</span></a></li><li><a href="#prior-art"><span>Prior art</span></a></li><li><a href="#alternatives"><span>Alternatives</span></a></li><li><a href="#license"><span>License</span></a></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">sensemaking</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
+</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#sensemaking"><span>sensemaking</span></a><ul><li><a href="#problem"><span>Problem</span></a></li><li><a href="#quick-start"><span>Quick start</span></a></li><li><a href="#model"><span>Model</span></a></li><li><a href="#commands"><span>Commands</span></a></li><li><a href="#config"><span>Config</span></a></li><li><a href="#scale"><span>Scale</span></a></li><li><a href="#for-ai-agents"><span>For <wbr/>AI agents</span></a></li><li><a href="#prior-art"><span>Prior art</span></a></li><li><a href="#alternatives"><span>Alternatives</span></a></li><li><a href="#license"><span>License</span></a></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">sensemaking</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
