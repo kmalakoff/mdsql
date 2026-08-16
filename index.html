@@ -1,6 +1,7 @@
 <!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>sensemaking</title><meta name="description" content="Documentation for sensemaking"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script><script async src="assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="index.html" class="title">sensemaking</a><div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h1>sensemaking</h1></div><div class="tsd-panel tsd-typography"><h1 id="sensemaking" class="tsd-anchor-link">sensemaking<a href="#sensemaking" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
-<p>SQL over a tree of markdown notes: filter by frontmatter, search the prose, follow the links,
-read the structure. A CLI that starts, answers, and exits — no server, no build step.</p>
+<p>Query and search a tree of markdown notes: SQL over frontmatter and links, ranked search over
+the prose — words, links, and meaning fused. A CLI that starts, answers, and exits — no
+server, no build step.</p>
 <h2 id="problem" class="tsd-anchor-link">Problem<a href="#problem" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>Working with AI agents produces piles of small notes. Past a few dozen, finding the right ones
 means grepping or reading whole folders into context. The structure that makes notes navigable —
@@ -12,7 +13,7 @@ results are never stale and nothing has to be running.</p>
 <pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">install</span><span class="hl-1"> </span><span class="hl-3">-g</span><span class="hl-1"> </span><span class="hl-2">sensemaking</span><br/><span class="hl-0">cd</span><span class="hl-1"> </span><span class="hl-2">your-notes</span><span class="hl-1"> &amp;&amp; </span><span class="hl-0">sense</span><span class="hl-1"> </span><span class="hl-2">init</span>
 </code><button type="button">Copy</button></pre>
 
-<pre><code class="bash"><span class="hl-0">sense</span><span class="hl-1"> </span><span class="hl-2">map</span><span class="hl-1">                                        </span><span class="hl-4"># orient: fields, hub notes, recent changes</span><br/><span class="hl-0">sense</span><span class="hl-1"> </span><span class="hl-2">find</span><span class="hl-1"> </span><span class="hl-2">&quot;revenue OR earnings&quot;</span><span class="hl-1"> </span><span class="hl-3">--k</span><span class="hl-1"> </span><span class="hl-5">10</span><span class="hl-1">          </span><span class="hl-4"># locate: ranked references with excerpts</span><br/><span class="hl-0">sense</span><span class="hl-1"> </span><span class="hl-2">peek</span><span class="hl-1"> </span><span class="hl-2">notes/q3-report.md</span><span class="hl-1">                    </span><span class="hl-4"># structure: outline + links, before reading</span><br/><span class="hl-0">sense</span><span class="hl-1"> </span><span class="hl-2">query</span><span class="hl-1"> </span><span class="hl-2">&quot;SELECT path FROM frontmatter WHERE has(tags, ?)&quot;</span><span class="hl-1"> </span><span class="hl-2">urgent</span>
+<pre><code class="bash"><span class="hl-0">sense</span><span class="hl-1"> </span><span class="hl-2">map</span><span class="hl-1">                                        </span><span class="hl-4"># orient: fields, hub notes, recent changes</span><br/><span class="hl-0">sense</span><span class="hl-1"> </span><span class="hl-2">search</span><span class="hl-1"> </span><span class="hl-2">&quot;revenue OR earnings&quot;</span><span class="hl-1"> </span><span class="hl-3">--k</span><span class="hl-1"> </span><span class="hl-5">10</span><span class="hl-1">        </span><span class="hl-4"># locate: words + links + meaning, one ranked list</span><br/><span class="hl-0">sense</span><span class="hl-1"> </span><span class="hl-2">peek</span><span class="hl-1"> </span><span class="hl-2">notes/q3-report.md</span><span class="hl-1">                    </span><span class="hl-4"># structure: outline + links, before reading</span><br/><span class="hl-0">sense</span><span class="hl-1"> </span><span class="hl-2">query</span><span class="hl-1"> </span><span class="hl-2">&quot;SELECT path FROM frontmatter WHERE has(tags, ?)&quot;</span><span class="hl-1"> </span><span class="hl-2">urgent</span>
 </code><button type="button">Copy</button></pre>
 
 <h2 id="model" class="tsd-anchor-link">Model<a href="#model" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
@@ -72,8 +73,8 @@ so what it saves over reading grows with the file, and a small note is cheaper r
 <td>doc count, frontmatter field coverage, top hubs by link rank, recent changes</td>
 </tr>
 <tr>
-<td><code>find &quot;&lt;terms&gt;&quot; [--where &quot;&lt;sql&gt;&quot;] [--k n] [--semantic]</code></td>
-<td>BM25 + link-graph expansion, fused; <code>via</code> marks each row <code>match</code>, <code>link</code>, or <code>match+link</code></td>
+<td><code>search &quot;&lt;text&gt;&quot; [--preset name] [--include glob] [--where &quot;&lt;sql&gt;&quot;] [--k n] [--lexical]</code></td>
+<td>words + links + vectors, one fused ranked list; <code>via</code> labels each row's evidence</td>
 </tr>
 <tr>
 <td><code>peek &lt;path&gt;</code></td>
@@ -93,11 +94,11 @@ so what it saves over reading grows with the file, and a small note is cheaper r
 </tr>
 <tr>
 <td><code>status</code></td>
-<td>index location, doc count, feature state, watcher heartbeat</td>
+<td>index location, doc count, per-preset coverage, watcher heartbeat</td>
 </tr>
 <tr>
 <td><code>check</code></td>
-<td>prepare and run the saved queries, so a broken one fails here instead of mid-task</td>
+<td>run every saved query and search, so a broken one fails here instead of mid-task</td>
 </tr>
 <tr>
 <td><code>rebuild</code></td>
@@ -109,34 +110,37 @@ so what it saves over reading grows with the file, and a small note is cheaper r
 </tr>
 </tbody>
 </table>
-<p><code>find</code> seeds a personalized-PageRank walk with the BM25 matches, so a note that never contains
-the terms but is linked from ones that do still surfaces. Terms pass verbatim to FTS5 <code>MATCH</code>
-(bare words AND-join; operators are yours to write). <code>--where</code> takes any SQL condition against
-frontmatter alias <code>f</code>. On trees with the <code>embed</code> feature, <code>--semantic</code> additionally expands by
-meaning — explicit per query, never silent; rows it adds are labeled <code>via: vector</code> and carry
-<code>similarity</code> (cosine against the best-matching chunk). A <code>lines</code> column points at the section
-that earned a row — a direct read range. <code>--format json</code> on any command returns structured
-output; <code>--version</code> and <code>--help</code> do what they say.</p>
+<p><code>search</code> runs one text through every engine its scope has — FTS5 word match (BM25-ranked,
+bare words AND-join, operators are yours), a personalized-PageRank walk over the link graph,
+and vector similarity — fused into one list. <code>via</code> labels each row's evidence (<code>match</code>,
+<code>link</code>, <code>vector</code>, combinations); <code>similarity</code> is the cosine against the best-matching chunk;
+<code>lines</code> points at the section that earned the row — a direct read range. Rows that only
+vectors produced are the &quot;these words aren't in the tree, this is what's near in meaning&quot;
+signal. <code>--preset</code> picks a named settings bundle from the config, <code>--lexical</code> skips vectors
+for one command, <code>--where</code> filters on frontmatter. <code>--format json</code> on any command returns
+structured output; <code>--version</code> and <code>--help</code> do what they say.</p>
 <h2 id="config" class="tsd-anchor-link">Config<a href="#config" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p><code>sense init</code> writes <code>sense.config.json</code>; discovery walks up from cwd like git
-(<code>--config &lt;path&gt;</code> overrides). Name reusable queries and run them as <code>sense &lt;name&gt; [params...]</code>:</p>
-<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;$schema&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;https://unpkg.com/sensemaking/schema.json&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;version&quot;</span><span class="hl-1">: </span><span class="hl-5">2</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;scan&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;include&quot;</span><span class="hl-1">: [</span><span class="hl-2">&quot;**/*.md&quot;</span><span class="hl-1">] },</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;features&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;links&quot;</span><span class="hl-1">: </span><span class="hl-3">true</span><span class="hl-1">, </span><span class="hl-6">&quot;sections&quot;</span><span class="hl-1">: </span><span class="hl-3">true</span><span class="hl-1">, </span><span class="hl-6">&quot;rank&quot;</span><span class="hl-1">: </span><span class="hl-3">true</span><span class="hl-1"> },</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;defaults&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;find&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;where&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;f.type != &#39;generated&#39;&quot;</span><span class="hl-1"> } },</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;queries&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;dead-links&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;SELECT src, target FROM links WHERE dst IS NULL&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;by-tag&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;SELECT path, title FROM frontmatter WHERE has(tags, ?) ORDER BY path&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;hot&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;find&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;pricing OR billing&quot;</span><span class="hl-1">, </span><span class="hl-6">&quot;k&quot;</span><span class="hl-1">: </span><span class="hl-5">20</span><span class="hl-1"> }</span><br/><span class="hl-1">  },</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;checks&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;dead-links&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;empty&quot;</span><span class="hl-1"> }</span><br/><span class="hl-1">}</span>
+(<code>--config &lt;path&gt;</code> overrides). Three keys: <strong>presets</strong> (named, self-contained setting
+bundles), <strong>queries</strong> (saved commands), and the version.</p>
+<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;$schema&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;https://unpkg.com/sensemaking/schema.json&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;version&quot;</span><span class="hl-1">: </span><span class="hl-5">3</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;presets&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;default&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;include&quot;</span><span class="hl-1">: [</span><span class="hl-2">&quot;**/*.md&quot;</span><span class="hl-1">], </span><span class="hl-6">&quot;k&quot;</span><span class="hl-1">: </span><span class="hl-5">10</span><span class="hl-1"> },</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;raw&quot;</span><span class="hl-1">:     { </span><span class="hl-6">&quot;include&quot;</span><span class="hl-1">: [</span><span class="hl-2">&quot;raw/**/*.md&quot;</span><span class="hl-1">], </span><span class="hl-6">&quot;k&quot;</span><span class="hl-1">: </span><span class="hl-5">5</span><span class="hl-1">, </span><span class="hl-6">&quot;semantic&quot;</span><span class="hl-1">: </span><span class="hl-3">false</span><span class="hl-1"> }</span><br/><span class="hl-1">  },</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;queries&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;dead-links&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;SELECT src, target FROM links WHERE dst IS NULL&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;by-tag&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;SELECT path, title FROM frontmatter WHERE has(tags, ?) ORDER BY path&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;hot&quot;</span><span class="hl-1">: { </span><span class="hl-6">&quot;search&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;pricing OR billing&quot;</span><span class="hl-1">, </span><span class="hl-6">&quot;preset&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;raw&quot;</span><span class="hl-1"> }</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">}</span>
 </code><button type="button">Copy</button></pre>
 
-<p>A query entry is a SQL string, or a saved <code>find</code> with its settings baked in — <code>sense hot</code>
-then needs no flags. <code>defaults.find.where</code> scopes <code>find</code> tree-wide (an explicit <code>--where</code>
-replaces it, so <code>--where &quot;1=1&quot;</code> always reaches everything). <code>checks</code> turns a saved query
-into an assertion: <code>sense check</code> fails when a query marked <code>empty</code> returns rows. Every key
-is documented in <a href="media/schema.json">schema.json</a>, which editors read for autocomplete.</p>
-<p>Features toggle independently; disabling one degrades its command instead of failing it (<code>find</code>
-goes BM25-only without <code>links</code>, <code>map</code> drops hubs without <code>rank</code>, <code>peek</code> drops the outline
-without <code>sections</code>). Toggling rebuilds the cache. Older config versions auto-migrate on load,
-noted on stderr.</p>
-<p><code>embed</code> is opt-in — the only feature off by default, since most trees don't need vectors.
-<code>&quot;embed&quot;: true</code> uses the built-in static model (downloaded to <code>~/.cache/sensemaking</code> on first
-use, never in the package), or <code>{ &quot;model&quot;, &quot;type&quot;: &quot;static&quot;|&quot;api&quot;, &quot;url&quot;, &quot;key&quot; }</code> points at any Model2Vec model,
-local path, or OpenAI-compatible endpoint (Ollama, LM Studio, hosted). With it on, vectors stay
-fresh at reconcile and <code>find --semantic</code> uses them; default <code>find</code> results are unchanged.</p>
+<p>A preset bundles <code>include</code>/<code>exclude</code> globs (which files), <code>k</code> (result count), <code>semantic</code>
+(vectors, on unless <code>false</code>), and <code>where</code> (a standing SQL filter). Bare commands use
+<code>default</code>; <code>--preset</code> names another; flags override single fields. <strong>Indexing derives from
+the presets</strong>: a file is indexed if any preset includes it, and embedded if any covering
+preset has semantic on — so a <code>semantic: false</code> preset's files cost no vectors, and
+<code>status</code> shows each preset's coverage. Editing a preset rebuilds the cache and says which
+preset caused it.</p>
+<p>A query entry is a SQL string (<code>?</code> binds positional args) or a saved search with its
+settings baked in — <code>sense hot</code> needs no flags. <code>sense check</code> runs them all, so a typo'd
+column fails at check time instead of mid-task. Older config versions auto-migrate on
+load, noted on stderr.</p>
+<p>Vectors use the built-in static model (downloaded to <code>~/.cache/sensemaking</code> on first use,
+never in the package); an optional top-level <code>&quot;embed&quot;: { &quot;model&quot;, &quot;type&quot;, &quot;url&quot;, &quot;key&quot; }</code>
+block points at any Model2Vec model, local path, or OpenAI-compatible endpoint (Ollama,
+LM Studio, hosted). Embedding happens on the first semantic search, with progress.</p>
 <p><code>has(field, value)</code> is the one custom SQL function: array membership on JSON-array fields,
 substring on strings, false on missing keys. Frontmatter parsing is lenient — syntax errors are
 per-file warnings and the values are still indexed, so one bad note never costs you the crawl.</p>
@@ -173,6 +177,10 @@ just in time, because context is a finite resource. The commands implement that 
 agent-maintained wiki navigated by an <code>index.md</code> and links, which he notes needs real search
 infrastructure past a few hundred pages. <code>sense map</code> derives that index from the notes instead of
 maintaining it; <code>find</code> is the hybrid local search it calls for.</li>
+<li>Agent memory patterns — llm-wiki's raw/wiki split, Claude Code's dreaming-style nightly
+consolidation — are trees of small notes with metadata, links, and layers of differing
+authority. sense is the query layer such patterns need (filter by metadata and age, scope
+by layer, surface near-duplicates semantically), not an implementation of any one of them.</li>
 </ul>
 <h2 id="alternatives" class="tsd-anchor-link">Alternatives<a href="#alternatives" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <ul>
@@ -180,9 +188,10 @@ maintaining it; <code>find</code> is the hybrid local search it calls for.</li>
 query it headless.</li>
 <li><strong>Index-on-build tools (MarkdownDB)</strong> — query a snapshot; <code>sense</code> reconciles on every query.</li>
 <li><strong>Note CLIs (zk)</strong> — fixed schema; <code>sense</code> filters on arbitrary frontmatter.</li>
-<li><strong>RAG / vector stores</strong> — similarity can't express <code>WHERE status = 'active'</code>. Here vectors are
-the optional <code>embed</code> feature: same SQLite file, filters compose, expansion is explicit per
-query (<code>find --semantic</code>) and labeled — no second store, no daemon, no native builds.</li>
+<li><strong>RAG / vector stores</strong> — similarity can't express <code>WHERE status = 'active'</code>. Here vectors
+are one signal inside <code>search</code>: same SQLite file, filters compose, every row labels its
+evidence (<code>via</code>), and a preset turns vectors off per layer of the tree — no second store,
+no daemon, no native builds.</li>
 </ul>
 <p>Dependencies: <a href="https://github.com/eemeli/yaml">yaml</a>,
 <a href="https://github.com/zuchka/remove-markdown">remove-markdown</a>,
