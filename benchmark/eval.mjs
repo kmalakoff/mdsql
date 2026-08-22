@@ -30,19 +30,26 @@ const lib = await import(pathToFileURL(join(ROOT, 'dist', 'esm', 'index.js')).hr
 const { queries, qrels } = readLabels(labelsDir, SPLIT);
 const qids = [...qrels.keys()].sort().slice(0, MAX_QUERIES === Infinity ? undefined : MAX_QUERIES);
 
-// embed false -> preset semantic:false, vectors never built. embed true -> vectors build
-// lazily on the first participating call.
+// embed false -> preset semantic:false, vectors never built. embed true -> the config names
+// the model (nothing implicit turns vectors on since the explicit-embed change; without the
+// block, anyPresetEmbeds is false and the semantic pass silently measures lexical) and
+// vectors build lazily on the first participating call.
+const EMBED = { model: 'minishlab/potion-retrieval-32M', type: 'static' };
+// There is no per-call semantic option: the preset decides. `semanticOff` writes
+// `semantic: false` into the preset, which is the one lever the no-silent-change contract is
+// about.
 const VARIANTS = [
-  { name: 'bm25-only', features: { links: false, rank: false }, embed: false, searchSemantic: false },
-  { name: 'fused', features: undefined, embed: false, searchSemantic: false },
-  { name: 'fused-embed-configured', features: undefined, embed: true, searchSemantic: false, hidden: true }, // guard only
-  { name: 'semantic', features: undefined, embed: true, searchSemantic: undefined },
+  { name: 'bm25-only', features: { links: false, rank: false }, embed: false, semanticOff: true },
+  { name: 'fused', features: undefined, embed: false, semanticOff: true },
+  { name: 'fused-embed-configured', features: undefined, embed: true, semanticOff: true, hidden: true }, // guard only
+  { name: 'semantic', features: undefined, embed: true, semanticOff: false },
 ];
 
 const results = [];
 for (const variant of VARIANTS) {
   const cfg = {
-    presets: { default: { include: ['**/*.md'], ...(variant.embed ? {} : { semantic: false }) } },
+    presets: { default: { include: ['**/*.md'], ...(variant.semanticOff ? { semantic: false } : {}) } },
+    ...(variant.embed ? { embed: EMBED } : {}),
     features: variant.features,
     queries: {},
     baseDir: tree,
@@ -58,7 +65,7 @@ for (const variant of VARIANTS) {
     const t0 = process.hrtime.bigint();
     let rows = [];
     try {
-      rows = await lib.search(db, cfg, orBag(text), { k: K, semantic: variant.searchSemantic });
+      rows = await lib.search(db, cfg, orBag(text), { k: K });
     } catch {
       errors++;
     }
@@ -70,9 +77,9 @@ for (const variant of VARIANTS) {
   results.push({ ...variant, perQuery, errors, ms: ms / qids.length });
 }
 
-// Guard first: semantic:false must fully disable vector participation, even on a corpus
-// whose preset has vectors on -- fused-embed-configured must not diverge from fused by a
-// single row.
+// Guard first: a semantic:false preset must fully disable vector participation, even on an
+// embed-configured corpus -- fused-embed-configured must not diverge from fused by a single
+// row.
 const fused = results.find((r) => r.name === 'fused');
 const fusedEmbedConfigured = results.find((r) => r.name === 'fused-embed-configured');
 const divergent = qids.filter((qid) => fused.perQuery.get(qid)?.rows !== fusedEmbedConfigured.perQuery.get(qid)?.rows);
