@@ -157,16 +157,27 @@ Paired deltas: semantic vs fused is 108W/77L on nDCG (z=2.3) and 16W/8L on hit (
 the same shape as the 0.6.0 measurement (110W/77L, z=2.4), so the semantic gain carried
 through every release between.
 
-Results, fever (Apple Silicon, Node 26.7.0, 2026-08-13, 0.6.0):
+Results, fever (Apple Silicon, Node 26.7.0, 2026-08-22, local):
 
 | metric | bm25 | fused | semantic |
 |---|---|---|---|
-| nDCG@10 | 0.9436 | 0.9361 | 0.9435 |
-| MRR@10 | 0.9508 | 0.9381 | 0.9479 |
-| hit@10 | 0.9969 | 0.9971 | 0.9974 |
-| mean ms/query | 7.7 | 15.3 | 18.9 |
+| nDCG@10 | 0.9435 | 0.9360 | 0.9344 |
+| MRR@10 | 0.9508 | 0.9380 | 0.9352 |
+| hit@10 | 0.9969 | 0.9971 | 0.9967 |
+| mean ms/query | 9.0 | 16.7 | 20.9 |
 
-Paired deltas: on fever, semantic vs fused is 1084W/687L on nDCG (z=9.4).
+Paired deltas: fused vs bm25 is 615W/685L on nDCG (z=-1.9); semantic vs fused is
+1060W/961L (z=2.2), many small wins against fewer larger losses.
+
+**The bm25 and fused columns are bit-stable against the 0.6.0 measurement** (0.9436/0.9361
+then, 0.9435/0.9360 now, at 13,229 queries): five releases of changes left the lexical and
+link layers untouched. **The semantic column drifted down** (0.9435 -> 0.9344 nDCG, 0.9479
+-> 0.9352 MRR) somewhere in 0.7.x-0.11.x -- not attributable to any one release, because
+the column was never regenerated between; the candidates are the fusion tuning and the
+embed storage levers. This unattributable drift is what per-release regeneration
+(`benchmark/release.mjs`) exists to prevent going forward. Bisecting the drift across the
+published versions is possible if the ranking cost matters; the sign test says the net
+per-query effect is still positive.
 
 **Two eval-harness bugs were found and fixed this sitting, and they explain why the table
 above went stale.** After the explicit-embed change (0.10.0), eval's embed variants no
@@ -181,7 +192,7 @@ Read:
 
 - The published BEIR BM25 (Anserini) baseline for NFCorpus is nDCG@10 ≈ 0.32. The FTS5 pipeline matches it, so `find`'s lexical layer is a faithful BM25 rather than an approximation, and the identical fused column confirms link fusion is a no-op where there are no links.
 - **The two corpora are the ends of one axis**, and no customer tree is either: NFCorpus is maximal vocabulary gap (layman queries, jargon documents; 31% of queries have no relevant document in the top 10), FEVER is zero gap (claims quote their evidence nearly verbatim, 99.7% hit@10 for plain BM25). A change that wins on one by losing on the other is fitted to a corpus nobody has.
-- **Semantic expansion earns its cost where the gap is real** and does no harm where it isn't: +0.021 nDCG / +0.028 hit on NFCorpus, and on FEVER it recovers most of link fusion's ranking cost rather than adding noise (0.9361 → 0.9435 nDCG).
+- **Semantic expansion earns its cost where the gap is real**: +0.020 nDCG / +0.025 hit on NFCorpus (z=2.3). On FEVER it no longer recovers link fusion's ranking cost point-wise (0.9360 -> 0.9344 nDCG) though the sign test stays net-positive (z=2.2); see the drift note above.
 - **Link fusion's own contribution is smaller than the fused column suggests.** Its score comes largely from PageRank restart mass sitting on the seed set, which re-ranks matches in near-match order; on FEVER it costs ~1 point of MRR by occasionally promoting neighbors above the true evidence page. Removing that restart mass was measured and rejected: it drops FEVER hit@10 to 0.907. `via` labels are gated on a real incident edge, so the labels stay honest even where the score echo remains.
 
 ### Static-model bake-off (semantic-search-design.md, sequence step 2)
