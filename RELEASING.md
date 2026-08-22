@@ -2,16 +2,17 @@
 
 Everything that can block a release runs **before** the version bump, and publishing is the last step of all. A regression or a stale doc found after `npm publish` is already shipped: consumers install it, and the only remedy is another release.
 
+Subagents dispatched during a release are spawned with `model: sonnet`. Reviews at high or max effort go through the `code-review-sonnet` skill, which keeps the built-in review's fork and its workers on Sonnet whatever the session model.
+
 1. `npm test` and `npx tsds validate`, both clean. `npm run test:engines` when the release touches anything platform-near (SQLite pragmas, fs, watch): it runs the suite on the oldest supported Node, which is where "works on my machine" breaks.
 
 2. **Regenerate the benchmarks**, still on the previous version number. No release goes out on numbers from an earlier run (see [BENCHMARKING.md](BENCHMARKING.md)):
 
    ```bash
-   node benchmark/compare.mjs                                    # released baseline vs local
-   node benchmark/run.mjs . .tmp/cache/obsidian-hub-x2-x2-hub-1  # 13k scale row
-   node benchmark/run.mjs . .tmp/cache/obsidian-hub-x4-x4-hub-1  # 26k scale row
-   node benchmark/run.mjs . .tmp/cache/stress-stress-1           # shape-cliff guard row
+   node benchmark/release.mjs   # compare + 13k/26k scale + stress + both quality evals
    ```
+
+   One command on purpose: the gate was a list of manual steps for its first nine releases, and the fever quality eval was skipped by every sitting since 0.6.0 because nothing forced it. Fetches (corpora, npm baselines, the fever wiki dump) cache through `benchmark/lib/cache.mjs`, so only the first run on a machine pays the downloads.
 
 The stress corpus packs every measured shape cliff into one tree (1MB note, 200 headings/note, 100 links/note, 300 fields; see benchmark/lib/corpus.mjs); its rows moving means a fixed cliff regressed, regardless of how flat the hub rows look.
 
